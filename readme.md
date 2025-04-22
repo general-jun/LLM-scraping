@@ -114,7 +114,6 @@ GET /api/purge?beforeDate=2024-12-31
 | Pattern | Recurring - Cron |
 | Value | * * * * * 0 0 |
 | Data (JSON) | { "urlCode": "QNA" } |
-<br>
 | Description | Immdiate scraping from Technology Q&A |
 | Pattern | One-time |
 | Value | now |
@@ -128,7 +127,6 @@ GET /api/purge?beforeDate=2024-12-31
 | Pattern | Recurring - Cron |
 | Value | * * * * * 30 0 |
 | Data (JSON) | { "urlCode": "BLOG" } |
-<br>
 | Description | Immdiate scraping from Technology Blogs by SAP |
 | Pattern | One-time |
 | Value | now |
