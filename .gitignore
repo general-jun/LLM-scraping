@@ -1,5 +1,6 @@
 # 파일
-.vcap_services.json
+vcap_services.json
 
 # 폴더
 jupyter/
+
