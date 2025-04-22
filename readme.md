@@ -1,5 +1,5 @@
 ## ✅ 프로젝트 개요
-SAP 커뮤니티 사이트(Technology Q&A / Blog)에서 HTML 데이터를 수집(Scraping)하여 SAP HANA DB에 저장하는 Python API입니다.<br>수집된 Article은 Embedding처리에 활용할 예정입니다.
+SAP 커뮤니티 사이트(Technology Q&A / Blog)에서 HTML 데이터를 수집(Scraping)하여 SAP HANA DB에 저장하는 Application입니다.<br>수집된 Article은 Embedding처리에 활용할 예정입니다.
 
 
 ## 🔧 주요 구성 요소
