@@ -1,11 +1,13 @@
 import os, logging, json, uuid, re, requests, hashlib
 import pandas as pd
 from datetime import datetime
+from importlib import import_module
 from flask import Flask, request
 from flask_restx import Api, Resource, Namespace, fields
 from bs4 import BeautifulSoup as bs
 from hana_ml.dataframe import ConnectionContext
 from hana_ml.dataframe import create_dataframe_from_pandas
+from lib.util import generateUuid, getTitleHash, getInt, isValidDate
 
 _TARGET = {
     "QNA": "https://community.sap.com/t5/technology-q-a/qa-p/technology-questions",
@@ -47,34 +49,66 @@ port = int(os.getenv("PORT", 5000))
 api = Api(app, version='0.1', title='Scraping API Document', description="API Documentation for Scraping", doc="/")
 ns = api.namespace('api', description='Scraping Endpoints')
 
-# UUID 생성
-def generateUuid():
-    return uuid.uuid4().hex
+# Technology Q&A의 Article을 추출하여 JSON 객체로 반환
+# 추출 대상: 코멘트가 1건 이상이고 문제가 해결된 건 
+def parsingQnaArticle(articleList) -> dict:
+    result = {
+        "ID": [],
+        "CHECKSUM": [],
+        "TAG": [],
+        "TITLE": [],
+        "URL": [],
+        "SUMMARY": [],
+        "POSTED_DATE": [],
+        "AUTHOR": [],
+        "VIEWS": [],
+        "COMMENTS": [],
+        "IS_SOLVED": []
+    }
 
-# 해쉬값 생성
-def getTitleHash(data):
-    return hashlib.sha256(data.encode("utf-8")).hexdigest()
-
-# 문자를 숫자로 변환
-def getInt(tag):
-    return int(tag.get_text(strip=True)) if tag else 0
-
-# 날짜 유효성 검사
-def isValidDate(value):
-    if not value:
-        return False    
-    # 형식 및 유효값 검사
-    pattern = r"^\d{4}-\d{2}-\d{2}$"
-    if not re.match(pattern, value):
-        return False
     try:
-        datetime.strptime(value, "%Y-%m-%d")
-        return True
-    except ValueError:
-        return False
+        for article in articleList:
+            titleTag = article.select_one("h3 > a")
+            title = titleTag.get_text(strip=True)
+            url = "https://community.sap.com" + titleTag["href"]
+            summaryTag = article.select_one("footer p")
+            summary = summaryTag.get_text(strip=True)
+            timeTag = article.select_one("time")
+            postedDate = timeTag["datetime"]
+            authorTag = article.select_one("a.custom-tile-author-link[rel='author']")
+            author = authorTag.get_text(strip=True)
+            viewsTag = article.select_one("ul.custom-tile-statistics li.custom-tile-views b")
+            views = getInt(viewsTag)
+            commentsTag = article.select_one("ul.custom-tile-statistics li.custom-tile-replies b")
+            comments = getInt(commentsTag)
+            classNames = article.get("class", [])
+            isSolved = "custom-thread-solved" in classNames
+            if not isSolved and comments == 0:
+                continue            
+            result["ID"].append(generateUuid())
+            result["CHECKSUM"].append(getTitleHash(title))
+            result["TAG"].append("QNA")
+            result["TITLE"].append(title)
+            result["URL"].append(url)
+            result["SUMMARY"].append(summary)
+            result["POSTED_DATE"].append(postedDate)
+            result["AUTHOR"].append(author)
+            result["VIEWS"].append(views)
+            result["COMMENTS"].append(comments)
+            result["IS_SOLVED"].append(True)
+        return {
+            "columns": _COLUMNS,
+            "data": result,
+            "total": len(result["TITLE"])
+        }
+    except Exception as e:
+        logging.error(f"Q&A Article Parsing 중 오류 발생: {str(e)}")
+        raise
 
-# Technology Q&A의 Article을 추출하여 JSON 객체로 반환 
-def parsingQnaArticle(artic을eList):
+
+# Technology Blogs by SAP의 Article을 추출하여 JSON 객체로 반환
+# 추출 대상: 전체
+def parsingBlogArticle(articles) -> dict:
     result = {
         "ID": [],
         "CHECKSUM": [],
@@ -88,98 +122,58 @@ def parsingQnaArticle(artic을eList):
         "COMMENTS": [],
         "EMBEDDED": []
     }
+    
+    try:
+        for article in articles:
+            titleTag = article.select_one("h3 > a")
+            title = titleTag.get_text(strip=True)
+            url = "https://community.sap.com" + titleTag["href"]
+            summaryTag = article.select_one("p")
+            summary = summaryTag.get_text(strip=True)
+            timeTag = article.select_one("time")
+            postedDate = timeTag["datetime"]
+            authorTag = article.select_one("footer .custom-tile-author-info a[rel='author']")
+            author = authorTag.get_text(strip=True)
+            viewsTag = article.select_one("li.custom-tile-views b")
+            views = getInt(viewsTag)
+            commentsTag = article.select_one("li.custom-tile-replies b")
+            comments = getInt(commentsTag)
+            result["ID"].append(generateUuid())
+            result["CHECKSUM"].append(getTitleHash(title)),
+            result["TAG"].append("BLOG")
+            result["TITLE"].append(title)
+            result["URL"].append(url)
+            result["SUMMARY"].append(summary)
+            result["POSTED_DATE"].append(postedDate)
+            result["AUTHOR"].append(author)
+            result["VIEWS"].append(views)
+            result["COMMENTS"].append(comments)
+        return {
+            "columns": _COLUMNS,
+            "data": result,
+            "total": len(result["TITLE"])
+        }
+    except Exception as e:
+        logging.error(f"Blog Article Parsing 중 오류 발생: {str(e)}")
+        raise
 
-    for article in articleList:
-        titleTag = article.select_one("h3 > a")
-        title = titleTag.get_text(strip=True) if titleTag else ""
-        if not title:
-            continue
-        url = "https://community.sap.com" + titleTag["href"] if titleTag else ""
-        summaryTag = article.select_one("footer p")
-        summary = summaryTag.get_text(strip=True) if summaryTag else ""
-        timeTag = article.select_one("time")
-        postedDate = timeTag["datetime"] if timeTag and "datetime" in timeTag.attrs else ""
-        authorTag = article.select_one("a.custom-tile-author-link[rel='author']")
-        author = authorTag.get_text(strip=True) if authorTag else ""
-        viewsTag = article.select_one("ul.custom-tile-statistics li.custom-tile-views b")
-        views = getInt(viewsTag)
-        commentsTag = article.select_one("ul.custom-tile-statistics li.custom-tile-replies b")
-        comments = getInt(commentsTag)
-        
-        result["ID"].append(generateUuid())
-        result["CHECKSUM"].append(getTitleHash(title))
-        result["TAG"].append("QNA")
-        result["TITLE"].append(title)
-        result["URL"].append(url)
-        result["SUMMARY"].append(summary)
-        result["POSTED_DATE"].append(postedDate)
-        result["AUTHOR"].append(author)
-        result["VIEWS"].append(views)
-        result["COMMENTS"].append(comments)
-        result["EMBEDDED"].append(False)
-
-    return {
-        "columns": _COLUMNS,
-        "data": result,
-        "total": len(result["TITLE"])
-    }
-
-# Technology Blogs by SAP의 Article을 추출하여 JSON 객체로 반환 
-def parsingBlogArticle(articles):
-    result = {
-        "ID": [],
-        "CHECKSUM": [],
-        "TAG": [],
-        "TITLE": [],
-        "URL": [],
-        "SUMMARY": [],
-        "POSTED_DATE": [],
-        "AUTHOR": [],
-        "VIEWS": [],
-        "COMMENTS": [],
-        "EMBEDDED": []
-    }
-
-    for article in articles:
-        titleTag = article.select_one("h3 > a")
-        title = titleTag.get_text(strip=True) if titleTag else ""
-        if not title:
-            continue
-        url = "https://community.sap.com" + titleTag["href"] if titleTag else ""
-        summaryTag = article.select_one("p")
-        summary = summaryTag.get_text(strip=True) if summaryTag else ""
-        timeTag = article.select_one("time")
-        postedDate = timeTag["datetime"] if timeTag and "datetime" in timeTag.attrs else ""
-        authorTag = article.select_one("footer .custom-tile-author-info a[rel='author']")
-        author = authorTag.get_text(strip=True) if authorTag else ""
-        viewsTag = article.select_one("li.custom-tile-views b")
-        views = getInt(viewsTag)
-        commentsTag = article.select_one("li.custom-tile-replies b")
-        comments = getInt(commentsTag)
-
-        result["ID"].append(generateUuid())
-        result["CHECKSUM"].append(getTitleHash(title)),
-        result["TAG"].append("BLOG")
-        result["TITLE"].append(title)
-        result["URL"].append(url)
-        result["SUMMARY"].append(summary)
-        result["POSTED_DATE"].append(postedDate)
-        result["AUTHOR"].append(author)
-        result["VIEWS"].append(views)
-        result["COMMENTS"].append(comments),
-        result["EMBEDDED"].append(False)
-
-    return {
-        "columns": _COLUMNS,
-        "data": result,
-        "total": len(result["TITLE"])
-    }
+# Scrapper Module을 로딩하여 반환
+def loadScrapper(scrapType):
+    try:
+        modulePath = f"scrapper.{scrapType.lower()}"
+        return scrapperModule
+    except:
+        raise ValueError(f"Scrapper module이 없거나 scrapType이 유효하지 않습니다")
 
 # Article 저장
-def saveContent(data):
-    df = pd.DataFrame(columns=data["columns"], data=data["data"])
-    create_dataframe_from_pandas(connection_context=ccHana, table_name='KR_SAP_DEMO_LLM_SCRAPCHUNK', pandas_df=df, append=True)
-    logging.info(f"테이블(KR_SAP_DEMO_LLM_SCRAPCHUNK)에 {data['total']}건 저장되었습니다")
+def saveContent(data) -> None:
+    try:
+        df = pd.DataFrame(columns=data["columns"], data=data["data"])
+        create_dataframe_from_pandas(connection_context=ccHana, table_name='KR_SAP_DEMO_LLM_SCRAPCHUNK', pandas_df=df, append=True)
+        logging.info(f"테이블(KR_SAP_DEMO_LLM_SCRAPCHUNK)에 {data['total']}건 저장되었습니다")
+    except Exception as e:
+        logging.error(f"Article 저장 중 오류발생: {str(e)}")
+        raise
 
 # 사이트(Technology Q&A / Technology Blogs by SAP) Scraping 처리
 @ns.route("/scrap")
@@ -190,22 +184,29 @@ class processScrap(Resource):
     def get(self):
         urlCode = request.args.get("urlCode", default="QNA", type=str).upper()
         headers = { "User-Agent": "Chrome/135.0.0.0" }
-        response = requests.get(_TARGET[urlCode], headers=headers)
-        if response.status_code == 200:
-            logging.debug(f"컨텐츠 정보: {response.text}")
+        
+        try:
+            response = requests.get(_TARGET[urlCode], headers=headers)
+            if response.status_code == 200:
+                logging.debug(f"컨텐츠 정보: {response.text}")
 
-            # Article Parsing
-            bsContent = bs(response.text, 'html.parser')
-            articles = bsContent.select("article.custom-message-tile")
-            if urlCode == "QNA":
-                data = parsingQnaArticle(articles)
-            else:
-                data = parsingBlogArticle(articles)
-            # 컨텐츠 저장
-            saveContent(data)
-            return { "msg": f"{data['total']}건 처리되었습니다" }, 200
-        else:
-            return { "msg": "URL 접속 중 오류가 발생되었습니다" }, 500
+                # Article Parsing
+                bsContent = bs(response.text, 'html.parser')
+                articles = bsContent.select("article.custom-message-tile")
+                if urlCode == "QNA":
+                    data = parsingQnaArticle(articles)
+                else:
+                    data = parsingBlogArticle(articles)
+                # 컨텐츠 저장 후 DB Connection 닫기
+                saveContent(data)
+                ccHana.close()
+                return { "msg": f"{data['total']}건 처리되었습니다" }, 200
+        except RequestException as re:
+            logging.error(f"URL 요청 중 오류 발생: {str(re)}")
+            return { "msg": "URL 요청 중 오류가 발생되었습니다" }, 500 
+        except Exception as e:
+            logging.error(f"Article Parsing 중 오류 발생: {str(e)}")
+            return { "msg": "Article Parsing 중 오류가 발생되었습니다" }, 500
 
 # 오래된 Article 삭제 처리
 @ns.route("/purge")
@@ -220,7 +221,7 @@ class processPurge(Resource):
             return { "msg": "날짜가 입력되지 않았거나 유효하지 않습니다" }, 500
         # 삭제 처리
         if None:
-            return { f"Article {cnt}건 삭제되었습니다" }, 200
+            return { "msg": f"Article {cnt}건 삭제되었습니다" }, 200
         else:
             return { "msg": "Article 삭제 중 오류가 발생했습니다" }, 500
 
