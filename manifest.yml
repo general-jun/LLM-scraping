@@ -1,10 +1,17 @@
 applications:
+# 현재 상태
 - name: llm-scrap-service
+# 변경 예정
+#- name: llm-scraping-app
   random-route: true
   memory: 128M
   health-check-type: port
   buildpacks: 
     - python_buildpack
   services:
+# 현재 상태
     - llm-db
     - llm-schedule-service
+# 변경 예정
+#    - llm-db-svc
+#    - llm-scraping-svc
