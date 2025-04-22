@@ -1,5 +1,5 @@
 ## ✅ 프로젝트 개요
-SAP 커뮤니티 사이트(Technology Q&A / Blog)에서 HTML 데이터를 수집(Scraping)하여 SAP HANA DB에 저장하는 Application입니다.<br>수집된 Article은 Embedding처리에 활용할 예정입니다.
+SAP 커뮤니티 사이트(Technology Q&A / Blog)에서 HTML 데이터를 수집(Scraping)하여 SAP HANA DB에 저장하는 Application<br>개발을 목표로 하고있으며 수집된 Article은 향후 Embedding처리에 활용할 예정입니다.
 
 
 ## 🔧 주요 구성 요소
@@ -33,9 +33,10 @@ _TARGET = {
 ```python
 bsContent = bs(response.text, 'html.parser')
 articles = bsContent.select("article.custom-message-tile")
+...
 ```
 ### 3. 항목별 데이터 추출
-- 제목, 요약, 날짜, 작성자, 조회수, 댓글 수 등
+- 제목, 요약, 게시일, 작성자, 조회수, 댓글수 등
 - 중복(Article) 검사를 위한 SHA256 해시값 변환 및 셋팅
 - 고유ID값 설정을 위한 UUID 생성 및 셋팅
 
@@ -43,19 +44,20 @@ articles = bsContent.select("article.custom-message-tile")
 ```python
 df = pd.DataFrame(columns=data["columns"], data=data["data"])
 create_dataframe_from_pandas(connection_context=ccHana, pandas_df=df, table_name='KR_SAP_DEMO_LLM_SCRAPCHUNK')
+...
 ```
 
 
 ## 📌 함수 요약
-| 함수명 | 설명 |
-|--------|------|
-| `getTitleHash(title)` | Parameter 값을 Hash(SHA256) 값으로 변환 |
-| `generateUuid()` | UUID 생성 |
-| `getInt(tag)` | Parameter 값을 숫자로 변환  |
-| `isValidDate(value)` | 날짜형식(yyyy-mm-dd) 및 날짜값 유효성 검사 |
-| `parsingQnaArticle()` | QNA Article Parsing 및 정리 |
-| `parsingBlogArticle()` | BLOG Article Parsing 및 정리 |
-| `saveContent(data)` | Dataframe을 이용한 저장 처리 |
+| 함수명 | 반환값 | 설명 |
+|--------|------|----|
+| `getTitleHash(title)` | str | Parameter 값을 Hash(SHA256) 값으로 변환 |
+| `generateUuid()` | str |  UUID 생성 |
+| `getInt(tag)` | str | Parameter 값을 숫자로 변환  |
+| `isValidDate(value)` | bool | 날짜형식(yyyy-mm-dd) 및 날짜값 유효성 검사 |
+| `parsingQnaArticle()` | dict | QNA Article Parsing 및 정리 |
+| `parsingBlogArticle()` | dict | BLOG Article Parsing 및 정리 |
+| `saveContent(data)` | None | Dataframe을 이용한 저장 처리 |
 
 
 ## ⚙️ Swagger 문서 경로
@@ -94,9 +96,15 @@ GET /api/purge?beforeDate=2024-12-31
 - JobScheduler의 수행상태 확인을 위한 API 개발<br>REST API Document: https://help.sap.com/docs/job-scheduling/sap-job-scheduling-service/retrieve-job-run-log-details?locale=en-US&mt=ko-KR
 
 
+## 🧠 향후 검토
+- 사이트별 Scrapper를 Module로 개발하여 다양한 Site를 대응하더라도 컨텐츠를 저장하는 SAP Community 컨텐츠 저장에 맞춰진 현재 테이블 구조로는 대응이 불가<br>컨텐츠를 JSON String으로 변환하여 단일컬럼에 저장하는 방식으로 검토
+- 컨텐츠 저장방식 변경 시 UI에서 해당 데이터 조회 시 사용자가 알아보기 어렵다는 단점이 발생<br> Service Level에서 JSON String을 개별항목으로 분리하여 화면에 보여줄 수 있는 방안으로 CDS + Procedure 조합 또는 REST API로 구현 또는 별도 테이블 + Trigger 조합
+
 ## 📎 참고사항 - Job Scheduling Service 
 - Dashboard: https://jobscheduler-dashboard.cfapps.ap12.hana.ondemand.com/manageinstances/b78ef70b-c7ea-45d5-b8b2-10f7a598f4d8
-- Scraping 수행 설정: 1개의 Job과 4개의 Schedules 구성
+- Scraping 수행 설정: 1개의 Job과 2개의 Schedules로 구성
+- 지정된 시간에 수행되는 Schedule<br>Daily scraping from Technology Q&A<br>Daily scraping from Technology Blogs by SAP
+- 일회성으로 수행되는 Schedule<br>Immdiate scraping from Technology Q&A<br>Immdiate scraping from Technology Blogs by SAP
 
 
 ## 📎 참고사항 - Job 설정
