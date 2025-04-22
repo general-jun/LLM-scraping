@@ -1,0 +1,10 @@
+applications:
+- name: llm-scrap-service
+  random-route: true
+  memory: 128M
+  health-check-type: port
+  buildpacks: 
+    - python_buildpack
+  services:
+    - llm-db
+    - llm-schedule-service
