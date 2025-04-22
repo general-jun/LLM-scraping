@@ -97,7 +97,7 @@ GET /api/purge?beforeDate=2024-12-31
 
 
 ## 🧠 향후 검토
-- 사이트별 Scrapper를 Module로 개발하여 다양한 Site를 대응하더라도 컨텐츠를 저장하는 SAP Community 컨텐츠 저장에 맞춰진 현재 테이블 구조로는 대응이 불가<br>컨텐츠를 JSON String으로 변환하여 단일컬럼에 저장하는 방식으로 검토
+- 사이트별 Scrapper를 Module로 개발하여 다양한 Site를 대응하더라도 컨텐츠를 저장하는 테이블이 SAP Community 컨텐츠 구조에 맞춘 상태로서 범용적으로 사용하기에는 한계가 있음<br>컨텐츠를 JSON String으로 변환하여 단일컬럼에 저장하는 방식으로 검토
 - 컨텐츠 저장방식 변경 시 UI에서 해당 데이터 조회 시 사용자가 알아보기 어렵다는 단점이 발생<br> Service Level에서 JSON String을 개별항목으로 분리하여 화면에 보여줄 수 있는 방안으로 CDS + Procedure 조합 또는 REST API로 구현 또는 별도 테이블 + Trigger 조합
 
 ## 📎 참고사항 - Job Scheduling Service 
